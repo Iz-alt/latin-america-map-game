@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini GeoGuessr – Caribbean & Latin America</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      padding: 0.75rem 1rem;
+      background: #020617;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    #game-container {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(260px, 1.2fr);
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    #sidebar {
+      background: #020617;
+      border-left: 1px solid #1f2937;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #9ca3af;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: #d1d5db;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+
+    select {
+      width: 100%;
+      padding: 0.4rem 0.5rem;
+      border-radius: 0.375rem;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 0.45rem 0.75rem;
+      border-radius: 0.375rem;
+      border: none;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    #guess-btn {
+      background: #22c55e;
+      color: #022c22;
+    }
+
+    #next-btn {
+      background: #3b82f6;
+      color: #eff6ff;
+    }
+
+    #guess-btn:disabled,
+    #next-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    #status {
+      font-size: 0.9rem;
+      min-height: 2.5rem;
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.375rem;
+      background: #020617;
+      border: 1px solid #1f2937;
+      white-space: pre-line;
+    }
+
+    .status-correct {
+      border-color: #22c55e;
+      color: #bbf7d0;
+    }
+
+    .status-wrong {
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+    .status-neutral {
+      border-color: #1f2937;
+      color: #e5e7eb;
+    }
+
+    #score {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    @media (max-width: 800px) {
+      #game-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: 2fr auto;
+      }
+      #sidebar {
+        border-left: none;
+        border-top: 1px solid #1f2937;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mini GeoGuessr – Caribbean & Latin America</h1>
+    <div id="score">Score: 0 / 0</div>
+  </header>
+
+  <div id="game-container">
+    <div id="map"></div>
+
+    <aside id="sidebar">
+      <h2>Guess the country</h2>
+
+      <div>
+        <label for="country-select">Where do you think this location is?</label>
+        <select id="country-select">
+          <option value="">-- Choose a country --</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+        <button id="guess-btn">Submit guess</button>
+        <button id="next-btn" disabled>Next round</button>
+      </div>
+
+      <div id="status" class="status-neutral">
+        Explore the map, then pick a country and submit your guess.
+      </div>
+    </aside>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // --- Country list with rough bounding boxes (latMin, latMax, lonMin, lonMax) ---
+    // These are approximate and just for game purposes, not for precise geography.
+    const countries = [
+      { name: "Antigua and Barbuda", bounds: { latMin: 17.0, latMax: 17.8, lonMin: -62.0, lonMax: -61.5 } },
+      { name: "Bahamas", bounds: { latMin: 20.5, latMax: 27.5, lonMin: -79.5, lonMax: -72.5 } },
+      { name: "Barbados", bounds: { latMin: 13.0, latMax: 13.4, lonMin: -59.7, lonMax: -59.3 } },
+      { name: "Cuba", bounds: { latMin: 19.5, latMax: 23.5, lonMin: -84.9, lonMax: -74.0 } },
+      { name: "Dominica", bounds: { latMin: 15.2, latMax: 15.7, lonMin: -61.5, lonMax: -61.2 } },
+      { name: "Dominican Republic", bounds: { latMin: 17.5, latMax: 20.1, lonMin: -72.0, lonMax: -68.3 } },
+      { name: "Grenada", bounds: { latMin: 11.9, latMax: 12.3, lonMin: -61.8, lonMax: -61.4 } },
+      { name: "Haiti", bounds: { latMin: 18.0, latMax: 20.1, lonMin: -74.5, lonMax: -71.6 } },
+      { name: "Jamaica", bounds: { latMin: 17.5, latMax: 18.8, lonMin: -78.5, lonMax: -76.0 } },
+      { name: "Puerto Rico", bounds: { latMin: 17.8, latMax: 18.6, lonMin: -67.3, lonMax: -65.2 } },
+      { name: "Saint Kitts and Nevis", bounds: { latMin: 17.0, latMax: 17.6, lonMin: -63.0, lonMax: -62.4 } },
+      { name: "Saint Lucia", bounds: { latMin: 13.7, latMax: 14.2, lonMin: -61.1, lonMax: -60.8 } },
+      { name: "St. Vincent and Grenadines", bounds: { latMin: 12.4, latMax: 13.5, lonMin: -61.5, lonMax: -61.0 } },
+      { name: "Trinidad and Tobago", bounds: { latMin: 10.0, latMax: 11.5, lonMin: -62.1, lonMax: -60.4 } },
+
+      { name: "Argentina", bounds: { latMin: -55.1, latMax: -21.8, lonMin: -73.6, lonMax: -53.6 } },
+      { name: "Belize", bounds: { latMin: 15.9, latMax: 18.5, lonMin: -89.2, lonMax: -87.5 } },
+      { name: "Bolivia", bounds: { latMin: -22.9, latMax: -9.7, lonMin: -69.6, lonMax: -57.5 } },
+      { name: "Brazil", bounds: { latMin: -33.8, latMax: 5.3, lonMin: -73.9, lonMax: -34.8 } },
+      { name: "Chile", bounds: { latMin: -55.9, latMax: -17.5, lonMin: -75.7, lonMax: -66.4 } },
+      { name: "Colombia", bounds: { latMin: -4.2, latMax: 13.4, lonMin: -79.0, lonMax: -66.8 } },
+      { name: "Costa Rica", bounds: { latMin: 8.0, latMax: 11.3, lonMin: -85.9, lonMax: -82.5 } },
+      { name: "Ecuador", bounds: { latMin: -5.0, latMax: 1.7, lonMin: -81.1, lonMax: -75.2 } },
+      { name: "El Salvador", bounds: { latMin: 13.0, latMax: 14.5, lonMin: -90.2, lonMax: -87.7 } },
+      { name: "French Guiana", bounds: { latMin: 2.1, latMax: 6.0, lonMin: -54.6, lonMax: -51.6 } },
+      { name: "Guatemala", bounds: { latMin: 13.7, latMax: 17.8, lonMin: -92.3, lonMax: -88.2 } },
+      { name: "Guyana", bounds: { latMin: 1.1, latMax: 8.6, lonMin: -61.4, lonMax: -56.5 } },
+      { name: "Honduras", bounds: { latMin: 12.9, latMax: 16.5, lonMin: -89.4, lonMax: -83.1 } },
+      { name: "Mexico", bounds: { latMin: 14.5, latMax: 32.7, lonMin: -118.5, lonMax: -86.7 } },
+      { name: "Nicaragua", bounds: { latMin: 10.7, latMax: 15.1, lonMin: -87.7, lonMax: -82.6 } },
+      { name: "Panama", bounds: { latMin: 7.0, latMax: 9.7, lonMin: -83.1, lonMax: -77.2 } },
+      { name: "Paraguay", bounds: { latMin: -27.6, latMax: -19.3, lonMin: -62.7, lonMax: -54.3 } },
+      { name: "Peru", bounds: { latMin: -18.4, latMax: -0.0, lonMin: -81.4, lonMax: -68.7 } },
+      { name: "Suriname", bounds: { latMin: 1.8, latMax: 6.0, lonMin: -58.1, lonMax: -53.9 } },
+      { name: "Uruguay", bounds: { latMin: -35.2, latMax: -30.1, lonMin: -58.5, lonMax: -53.1 } },
+      { name: "Venezuela", bounds: { latMin: 0.6, latMax: 12.5, lonMin: -73.4, lonMax: -59.8 } }
+    ];
+
+    // --- Populate dropdown ---
+    const selectEl = document.getElementById("country-select");
+    countries
+      .map(c => c.name)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        selectEl.appendChild(opt);
+      });
+
+    // --- Map setup ---
+    const map = L.map("map", {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([15, -70], 3);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    let currentCountry = null;
+    let currentLatLng = null;
+    let marker = null;
+    let totalRounds = 0;
+    let correctRounds = 0;
+
+    const statusEl = document.getElementById("status");
+    const scoreEl = document.getElementById("score");
+    const guessBtn = document.getElementById("guess-btn");
+    const nextBtn = document.getElementById("next-btn");
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function pickRandomLocation() {
+      const country = countries[Math.floor(Math.random() * countries.length)];
+      const b = country.bounds;
+      const lat = randomInRange(b.latMin, b.latMax);
+      const lon = randomInRange(b.lonMin, b.lonMax);
+      return { country, lat, lon };
+    }
+
+    function updateScore() {
+      scoreEl.textContent = `Score: ${correctRounds} / ${totalRounds}`;
+    }
+
+    function setStatus(text, type = "neutral") {
+      statusEl.textContent = text;
+      statusEl.classList.remove("status-correct", "status-wrong", "status-neutral");
+      statusEl.classList.add(`status-${type}`);
+    }
+
+    function startRound() {
+      const { country, lat, lon } = pickRandomLocation();
+      currentCountry = country;
+      currentLatLng = [lat, lon];
+
+      if (marker) {
+        map.removeLayer(marker);
+      }
+      marker = L.marker(currentLatLng).addTo(map);
+
+      // Zoom level: big countries vs tiny islands
+      const isSmallIsland = country.bounds.latMax - country.bounds.latMin < 1 &&
+                            country.bounds.lonMax - country.bounds.lonMin < 1;
+      const zoom = isSmallIsland ? 11 : 6;
+
+      map.setView(currentLatLng, zoom);
+
+      selectEl.value = "";
+      guessBtn.disabled = false;
+      nextBtn.disabled = true;
+      setStatus("Explore the map, then pick a country and submit your guess.", "neutral");
+    }
+
+    guessBtn.addEventListener("click", () => {
+      const guess = selectEl.value;
+      if (!guess) {
+        setStatus("Choose a country before submitting your guess.", "neutral");
+        return;
+      }
+
+      totalRounds += 1;
+      if (guess === currentCountry.name) {
+        correctRounds += 1;
+        setStatus(`Correct! It was ${currentCountry.name}.`, "correct");
+      } else {
+        setStatus(`Not quite.\nYou guessed: ${guess}\nCorrect answer: ${currentCountry.name}`, "wrong");
+      }
+      updateScore();
+      guessBtn.disabled = true;
+      nextBtn.disabled = false;
+    });
+
+    nextBtn.addEventListener("click", () => {
+      startRound();
+    });
+
+    // Start first round
+    startRound();
+  </script>
+</body>
+</html>
