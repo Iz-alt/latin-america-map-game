@@ -252,10 +252,11 @@
       attributionControl: true
     }).setView([15, -70], 3);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    L.tileLayer("https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: "&copy; OpenMapTiles &copy; OpenStreetMap contributors"
+}).addTo(map);
+
 
     let currentCountry = null;
     let currentLatLng = null;
